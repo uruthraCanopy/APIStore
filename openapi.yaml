@@ -1,0 +1,513 @@
+openapi: 3.0.1
+info:
+  title: IdCanopy API
+  description: This API allows integration with IdCanopy's verification services.
+  version: 1.0.0
+servers:
+  - url: https://api.idcanopy.io/v1
+
+paths:
+  /handshake:
+    post:
+      summary: Initiate a customer journey handshake
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HandshakeDTO'
+      responses:
+        '200':
+          description: Successful handshake
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HandshakeResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal Server Error
+
+  /webhook:
+    get:
+      summary: Retrieve the results of the handshake
+      parameters:
+        - in: query
+          name: journey_id
+          required: true
+          schema:
+            type: string
+          description: The token provided in the handshake response called journey_id
+      responses:
+        '200':
+          description: Handshake results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          description: Invalid request
+        '404':
+          description: Results not found
+        '500':
+          description: Internal Server Error
+
+  /transaction:
+    get:
+      summary: retrieve transaction (from webhook)
+
+      responses:
+        '201':
+          description: Transaction created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal Server Error
+
+components:
+  schemas:
+    HandshakeDTO:
+      type: object
+      properties:
+        journey:
+          type: object
+          properties:
+            customer_journey_id:
+              type: string
+              description: Your process identifier, provided by IDCanopy
+            validation_data:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                  description: Hans
+            pass_through_data:
+              type: object
+              additionalProperties:
+                type: string
+              description: Add additional journey-level data here
+            steps:
+              type: array
+              items:
+                type: object
+                properties:
+                  interface:
+                    type: string
+                    description: Consider for future use with high-level categories
+                  step:
+                    type: string
+                    description: Specify the verification step (e.g., "Self KYC")
+                  configuration:
+                    type: object
+                    description: Add step-specific configuration based on verification type (details depend on step)
+                  validation_data:
+                    type: object
+                    properties:
+                      dob:
+                        type: string
+                        description: YYYY-MM-DD
+            match_name:
+              type: string
+              description: Specify name matching criteria (e.g., "fuzzy")
+            match_dob:
+              type: boolean
+              description: Specify date of birth matching criteria
+            magicflow:
+              type: boolean
+              description: Enables/disables developer mode
+            validity_superpower:
+              type: boolean
+              description: Extends ui_handle validity from 5 to 60 minutes
+            journey_duration:
+              type: string
+              description: Sets maximum journey duration default 300 seconds
+      required:
+        - journey
+
+    HandshakeResponse:
+      type: object
+      properties:
+        journey_id:
+          type: string
+        ui_handle:
+          type: string
+          description: a url provided by IDCanopy
+        expiration:
+          type: string
+          format: date-time
+
+    TransactionResponse:
+      type: object
+      properties:
+        general_transaction_data:
+          $ref: '#/components/schemas/GeneralTransactionData'
+        pass_through_data:
+          type: object
+          additionalProperties:
+            type: string
+        journey_summary:
+          type: array
+          items:
+            $ref: '#/components/schemas/JourneySummary'
+      required:
+        - general_transaction_data
+        - journey_summary
+
+
+    GeneralTransactionData:
+      type: object
+      properties:
+        customer_journey_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [COMPLETE, PROCESSING, ABORTED, CLOSED, ERROR]
+        success:
+          type: string
+          enum: [pass, decline, review, flag]
+        binary_response:
+          type: string
+
+    JourneySummary:
+      type: object
+      properties:
+        journey_stats:
+          $ref: '#/components/schemas/JourneyStats'
+        identity_subject:
+          $ref: '#/components/schemas/IdentitySubject'
+        authoritative_data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthoritativeData'
+        proof_of_work:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProofOfWork'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/Step'
+        fraud_alerts:
+          $ref: '#/components/schemas/FraudAlerts'
+        audit_trail:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditTrail'
+        journey_documentation:
+          type: string
+
+    JourneyStats:
+      type: object
+      properties:
+        completed_steps:
+          type: integer
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        key:
+          type: string
+        value:
+          type: string
+
+    IdentitySubject:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [person, company, government]
+        full_name:
+          type: string
+        name_structure:
+          $ref: '#/components/schemas/NameStructure'
+        gender:
+          type: string
+          enum: [M, F, D]
+        nationality:
+          type: string
+          description: iso alpha-2 format
+        second_nationality:
+          type: string
+        dob:
+          type: string
+          format: date
+        place_of_birth:
+          type: string
+        address_single_line:
+          type: string
+        native_address_single_line:
+          type: string
+        address_coordinates:
+          type: string
+        address_maps_handle:
+          type: string
+        formatted_address:
+          $ref: '#/components/schemas/FormattedAddress'
+        secondary_address_single_line:
+          type: string
+        address_free_description:
+          type: string
+        email:
+          type: string
+        mobile_number:
+          type: string
+        tax_number:
+          type: string
+        personal_number:
+          type: string
+        non_PII_data:
+          $ref: '#/components/schemas/NonPIIData'
+
+    NameStructure:
+      type: object
+      properties:
+        titles_prefix:
+          type: string
+        titles_suffix:
+          type: string
+        native_full_name:
+          type: string
+        native_first_name:
+          type: string
+        native_middle_name:
+          type: string
+        native_last_name:
+          type: string
+        first_name:
+          type: string
+        middle_name:
+          type: string
+        last_name:
+          type: string
+        normalized_full_name:
+          type: string
+        Fathers_Mothers_name:
+          type: string
+        native_Fathers_Mothers_name:
+          type: string
+        name_re_text:
+          type: string
+
+    FormattedAddress:
+      type: object
+      properties:
+        street_address:
+          type: string
+        locality:
+          type: string
+        region:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+          description: Country code (ISO 3166-1 alpha-2)
+
+    NonPIIData:
+      type: object
+      properties:
+        ip_address:
+          type: string
+        device_fingerprint:
+          type: object
+        geo_location:
+          type: string
+        free_data:
+          type: string
+
+    AuthoritativeData:
+      type: object
+      properties:
+        identity_document:
+          $ref: '#/components/schemas/IdentityDocument'
+        electronic_identity:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+        register_data:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+
+    IdentityDocument:
+      type: object
+      properties:
+        type:
+          type: string
+        id_number:
+          type: string
+        personal_number:
+          type: string
+        issuing_date:
+          type: string
+          format: date
+        expiration_date:
+          type: string
+          format: date
+        expeditor:
+          type: string
+        issuing_country:
+          type: string
+        native_expeditor:
+          type: string
+        MRZ:
+          type: string
+        nationality:
+          type: string
+        address_on_id:
+          type: string
+        native_address_on_id:
+          type: string
+        type_specific_data:
+          $ref: '#/components/schemas/TypeSpecificData'
+        verification_channel:
+          type: string
+          enum: [optical, NFC]
+        chip_data:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+        QRCode:
+          type: object
+        size:
+          type: string
+        eye_color:
+          type: string
+        impairments:
+          type: string
+        special_remarks:
+          type: string
+        free_data:
+          type: string
+
+    TypeSpecificData:
+      type: object
+      properties:
+        drivers_license:
+          type: array
+          items:
+            type: object
+            properties:
+              classes:
+                type: string
+              free_data:
+                type: string
+
+    ProofOfWork:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [image, electronic excerpt, RFU]
+        title_of_proof:
+          type: string
+          enum: [Selfie, ID_front, ID_back, eID_auth, register_confirmation, RFU]
+        content_of_proof:
+          type: string
+        timestamp_of_proof:
+          type: string
+
+    Step:
+      type: object
+      properties:
+        interface:
+          type: string
+        step:
+          type: string
+        work:
+          type: array
+          items:
+            $ref: '#/components/schemas/Work'
+
+    Work:
+      type: object
+      properties:
+        workstep:
+          type: string
+        workstep_attempt:
+          type: string
+        workstep_start:
+          type: string
+          format: date-time
+        workstep_end:
+          type: string
+          format: date-time
+        workstep_status:
+          type: string
+          enum: [pass, fail, skip, review, fail]
+        workstep_score:
+          type: string
+        workstep_data:
+          type: object
+        workstep_verification_source:
+          type: string
+        workstep_result_data:
+          type: object
+
+    FraudAlerts:
+      type: object
+      properties:
+        fraud_alert_detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/FraudAlertDetail'
+        aggregate_fraud_alert_score:
+          type: integer
+
+    FraudAlertDetail:
+      type: object
+      properties:
+        fraud_event:
+          type: string
+          enum: [failed check, attack, black list]
+        fraud_detail:
+          type: string
+          enum: [facematch fail, facematch fraud, intrusion attack, repeat fraud]
+        fraud_evidence:
+          type: string
+        fraud_severity:
+          type: string
+          enum: [suspicion, minor, critical]
+        fraud_event_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    AuditTrail:
+      type: object
+      properties:
+        work_id:
+          type: string
+        work_name:
+          type: string
+        work_status:
+          type: string
+          enum: [PASS, SKIP, FAIL]
+        work_start_tst:
+          type: string
+          format: date-time
+        work_end_tst:
+          type: string
+          format: date-time
+        work_result:
+          type: string
+        work_artifact:
+          type: object
+
+
+
